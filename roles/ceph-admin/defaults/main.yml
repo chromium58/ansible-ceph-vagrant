@@ -1,0 +1,4 @@
+---
+# defaults file for ceph-admin
+release_name: "xenial"
+ceph_admin_user: "cephadm"

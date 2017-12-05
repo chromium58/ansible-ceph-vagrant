@@ -1,0 +1,113 @@
+---
+# tasks file for ceph-admin
+
+- name: Add APt key
+  apt_key:
+    url: "https://download.ceph.com/keys/release.asc"
+    state: present
+
+- name: Add ceph Repo
+  apt_repository:
+    repo: "deb https://download.ceph.com/debian/ {{ release_name }} main"
+    state: present
+    update_cache: yes
+
+- name: Install ceph-deploy
+  apt:
+    name: ceph-deploy
+    state: present
+  update_cache: yes
+
+- name: Create ceph user
+  user:
+    name: "{{ ceph_admin_user }}"
+    state: present
+
+- name: Create ssh-keys directory
+  file:
+    path: "/home/{{ ceph_admin_user }}/.ssh"
+    state: directory
+    owner: "{{ ceph_admin_user }}"
+
+- name: Deploy public ssh key
+  blockinfile:
+    dest: "/home/{{ ceph_admin_user }}/.ssh/id_rsa.pub"
+    block: "{{ ceph_admin_user_pubkey }}"
+    owner: "{{ ceph_admin_user }}"
+    create: yes
+    mode: 0600
+
+- name: Deploy private ssh key
+  blockinfile:
+    dest: "/home/{{ ceph_admin_user }}/.ssh/id_rsa"
+    block: "{{ ceph_admin_user_privkey }}"
+    owner: "{{ ceph_admin_user }}"
+    create: yes
+    mode: 0600
+
+- name: Create configurate directory
+  file:
+    dest: /etc/ceph
+    state: directory
+    owner: "{{ ceph_admin_user }}"
+
+- name: Remove ssh host verification for ceph nodes
+  blockinfile:
+    path: '/etc/ssh/ssh_config'
+    block: |
+      Host {{ item.value.hostname }}
+        StrictHostKeyChecking no
+        UserKnownHostsFile=/dev/null
+    state: present
+    marker: "# {mark} ANSIBLE MANAGED BLOCK {{ item.value.hostname }}"
+  with_dict: "{{ nodes }}"
+
+- name: debug nodes dictionary
+  debug: var="item"
+  with_dict: "{{ nodes }}"
+
+- name: Add nodes to hosts
+  lineinfile:
+    create: yes
+    path: '/etc/hosts'
+    line: "{{ item.value.ip }} {{ item.value.hostname }}"
+    state: present
+  with_dict: "{{ nodes }}"
+
+- name: Create initial cluster
+  command: "ceph-deploy new {{ monitor_instances|join(' ') }}"
+  args:
+    chdir: /etc/ceph
+  become: yes
+  become_user: "{{ ceph_admin_user }}"
+
+- name: Install ceph on nodes
+  command: 'ceph-deploy install {{ item.value.hostname }}'
+  args:
+    chdir: /etc/ceph
+  become: yes
+  become_user: "{{ ceph_admin_user }}"
+  with_dict: "{{ nodes }}"
+
+- name: Deploy the initial monitor(s) and gather the keys
+  command: ceph-deploy mon create-initial
+  args:
+    chdir: /etc/ceph
+  become: yes
+  become_user: "{{ ceph_admin_user }}"
+
+- name: Use ceph-deploy to copy the configuration file and admin key
+  command: "ceph-deploy admin {{ item.value.hostname }}"
+  args:
+    chdir: /etc/ceph
+  become: yes
+  become_user: "{{ ceph_admin_user }}"
+  with_dict: "{{ nodes }}"
+
+- name: Create OSDs
+  command: "ceph-deploy osd create {{ item.value.hostname }}:{{ item.value.disk }}"
+  args:
+    chdir: /etc/ceph
+  become: yes
+  become_user: "{{ ceph_admin_user }}"
+  with_dict: "{{ nodes }}"

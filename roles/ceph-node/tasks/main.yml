@@ -1,0 +1,31 @@
+---
+# tasks file for ceph-node
+
+- name: Create ceph user
+  user:
+    name: "{{ ceph_admin_user }}"
+    state: present
+
+- name: Add authorized_key for ceph user
+  authorized_key:
+    user: "{{ ceph_admin_user}}"
+    state: present
+    key: "{{ ceph_admin_user_pubkey }}"
+
+- name: Add passwordless sudo privileges to ceph user
+  lineinfile:
+    create: yes
+    path: '/etc/sudoers.d/{{ ceph_admin_user }}'
+    line: "{{ ceph_admin_user }} ALL = (root) NOPASSWD:ALL"
+    state: present
+    mode: 0440
+
+- name: Install ntp packages
+  apt:
+    name: '{{ item }}'
+    state: present
+  update_cache: yes
+  with_items:
+    - ntp
+    - ntpdate
+    - ntp-doc

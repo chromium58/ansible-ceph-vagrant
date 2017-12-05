@@ -1,0 +1,23 @@
+---
+release_name: "xenial"
+ceph_admin_user: "cephadm"
+ceph_admin_user_pubkey: "ENTER SSH PUBLIC KEY HERE"
+ceph_admin_user_privkey: "SSH PRIVATE KEY HERE" # PUT THIS VARIABLE IN DEDICATED FILE ENCRYPTED WITH ANSIBLE-VAULT
+nodes:
+  node1:
+    ip: 192.168.33.20
+    hostname: machine2
+    disk: sdc
+  node2:
+    ip: 192.168.33.30
+    hostname: machine3
+    disk: sdc
+  node3:
+    ip: 192.168.33.40
+    hostname: machine4
+    disk: sdc
+
+monitor_instances:
+  - machine2
+  - machine3
+  - machine4
